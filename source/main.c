@@ -9,6 +9,8 @@
  */
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <stdio.h> 
+#include <stdlib.h>
 #ifdef _SIMULATE_
 #include "simAVRHeader.h"
 #endif
@@ -71,19 +73,88 @@ void PWM_off() {
   TCCR3A = 0x00;
   TCCR3B = 0x00;
 }
+
+#define A0 (~PINA & 0x01)
+unsigned char arrIndex = 0;
+unsigned char i = 8;
 double noteArr[8] = {261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25};
+enum States { start, wait, play, hold, stop} State;
 
 void tick() {
+    switch(State) {
+	case start:
+	    State = wait;
+	    break;
+	case wait:
+	    i = 8;
+	    if (A0) {
+	        State = play;    
+	    }
+	    else {
+		State = wait;
+	    }
+	    break;
+	case play:
+	    if (i > 0) {
+		i--;
+		State = play;
+	    }
+	    else {
+		if (A0) {
+		    State = hold;
+		}
+		else {
+		    State = stop;
+		}
+	    }
+	    break;
+	case hold:
+	    if (!A0) {
+		State = wait;
+	    }
+	    else {
+	        State = hold;
+	    }
+	    break;
+	case stop:
+	    state = wait;
+	    break;
+	default:
+	    state = start;
+	    break;
+    }
+    
+    switch(State) {
+	case start:
+	    set_PWM(0);
+	    break;
+	case wait:
+            break;
+	case play:
+	    arrIndex = (rand() % 8);
+	    set_PWM(noteArray[arrayIndex]);
+            break;
+	case hold:
+            break;
+	case stop:
+            break;
+	default:
+            break;
 }
+
 int main(void) {
     DDRA = 0x00;
     DDRB = 0xFF;
     PORTA = 0xFF;
     PORTB = 0x00;
-
+    State = start;
+    PWM_on();
+    TimerSet(50);
+    TimerOn();
     while(1){
 	tick();
-	
+	while(!TimerFlag) {}
+	TimerFlag = 0;
     }
  
     return 1;
